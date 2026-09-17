@@ -206,6 +206,7 @@ You can name the four Prometheus series that tell you whether the bottleneck is 
 
 ## Pre-production checklist
 
+- If FIPS is required: the image was built with `BASE_IMAGE=...-wolfi-fips`, `openssl-fips-test` passes in the built image, and Postgres and Redis are your own FIPS-mode services ([module 07](./07-standalone-helm-deploy.md#fips-builds)).
 Configuration ([module 04](./04-langgraph-json.md))
 
 - [ ] `langgraph.json` pins `python_version`, `image_distro` and either `base_image` or `api_version`.

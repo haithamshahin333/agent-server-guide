@@ -119,6 +119,12 @@ helm upgrade -i langsmith langchain/langsmith --values langsmith_config.yaml --v
 kubectl get pods -n <namespace>
 ```
 
+If your installation runs the FIPS image set, the operator has a `-fips` counterpart too:
+point `operatorImage.repository` at `langchain/langgraph-operator-fips` with the same tag, and build
+the agent images themselves from the `-fips` base as shown in
+[module 07](./07-standalone-helm-deploy.md#fips-builds)
+([FIPS-compliant images](https://docs.langchain.com/langsmith/self-host-fips)).
+
 ### Private registries for agent images
 
 Your agent images will live in your registry. Because the **operator** creates the Agent Server

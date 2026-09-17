@@ -15,6 +15,7 @@ fi
 REGISTRY="${REGISTRY:-}"                                  # e.g. registry.example.internal/platform
 KIND_CLUSTER="${KIND_CLUSTER:-}"                          # set to side-load the image into kind instead of pushing
 PLATFORM="${PLATFORM:-}"                                  # e.g. linux/amd64 for multi-arch build hosts
+BASE_IMAGE="${BASE_IMAGE:-}"                              # override the FROM line, e.g. langchain/langgraph-api:3.12-wolfi-fips
 
 NAMESPACE="${NAMESPACE:-agent-server}"
 RELEASE="${RELEASE:-agent-server}"

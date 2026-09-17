@@ -25,6 +25,7 @@ Terms are listed alphabetically within each group. The module where a term is fi
 | --- | --- |
 | **Deep Agents** [00, 03, 06] | Agents built with `create_deep_agent` from the `deepagents` package. They compile to a LangGraph graph, so they deploy on the Agent Server unchanged; their asynchronous subagents run as separate runs and occupy worker slots. |
 | **Managed Deep Agents** [00] | LangChain's hosted runtime for deep agents (private preview at the time of writing). A LangChain-hosted product, not one of the two self-hosted paths in this guide. |
+| **FIPS images** [04, 07] | `-fips` variants of the Wolfi Agent Server images built on Chainguard FIPS bases. Not selectable from `langgraph.json`; chosen by overriding the `FROM` line (`BASE_IMAGE` in `build.sh`). |
 | **`api_version`** [04] | `langgraph.json` key that pins the semantic version of the Agent Server used for builds. |
 | **Base image** [04, 07] | The LangChain image your code is installed on top of: `langchain/langgraph-api:<python>-<distro>` by default (the sample uses `3.12-wolfi`). Pin an exact one with `base_image`. |
 | **Compiled graph** [01] | A graph exported as an already-compiled object. Loaded once per container and reused; the recommended registration style. |
@@ -91,6 +92,7 @@ Every documentation page and repository cited anywhere in this guide, deduplicat
 - LangSmith Deployment overview: https://docs.langchain.com/langsmith/deployment
 - Deploy to self-hosted (topologies, who manages what): https://docs.langchain.com/langsmith/deploy-to-self-hosted-overview
 - Self-host standalone servers: https://docs.langchain.com/langsmith/deploy-standalone-server
+- FIPS-compliant images: https://docs.langchain.com/langsmith/self-host-fips
 - Deep Agents, going to production (uses `langgraph.json`): https://docs.langchain.com/oss/python/deepagents/going-to-production
 - Deep Agents, async subagents and worker-pool sizing: https://docs.langchain.com/oss/python/deepagents/async-subagents
 - Deploy with control plane: https://docs.langchain.com/langsmith/deploy-with-control-plane

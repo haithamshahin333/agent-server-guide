@@ -140,7 +140,7 @@ Types and defaults below are quoted from the CLI reference unless marked otherwi
 | `python_version` | `"3.11"`, `"3.12"` or `"3.13"` | `3.11` | Selects the base image tag. The sample uses `3.12`. |
 | `node_version` | `20` | none | Presence switches the build to LangGraph.js and the `langgraphjs-api` base image. |
 | `base_image` | string, `repository:server-version` | `langchain/langgraph-api` (or `langchain/langgraphjs-api`) | Pin the server release and/or point at a mirror, for example `"langchain/langgraph-server:0.2"`. The CLI appends `-py<python_version>-<image_distro>` to whatever you give it, so include the version after the colon and do not combine it with `api_version`. Added in `langgraph-cli==0.2.8`. Tags: https://hub.docker.com/r/langchain/langgraph-server/tags |
-| `image_distro` | `"debian"`, `"wolfi"`, `"bookworm"`, `"bullseye"` | `"debian"` | Linux distribution of the base image. Wolfi is recommended by the docs as smaller and more secure. Needs `langgraph-cli>=0.2.11`. |
+| `image_distro` | `"debian"`, `"wolfi"`, `"bookworm"`, `"bullseye"` | `"debian"` | Linux distribution of the base image. Wolfi is recommended by the docs as smaller and more secure. There is no FIPS value: the CLI rejects `"wolfi-fips"` (verified with 0.4.18, and the current schema lists only `debian`, `wolfi`, `bookworm`), so FIPS images are selected by overriding the `FROM` line; see below. Needs `langgraph-cli>=0.2.11`. |
 | `dockerfile_lines` | array of strings | none | Raw lines appended after `FROM`. Use for system packages: `["RUN apt-get update && apt-get install -y libjpeg-dev", "RUN pip install Pillow"]`. On Wolfi images use `apk`, not `apt-get`. |
 | `pip_config_file` | path | none | pip configuration copied into the build (private indexes, certificates). |
 | `pip_installer` | `"auto"`, `"pip"`, `"uv"` | uv behavior | Fall back to `"pip"` only if uv cannot resolve your dependency graph. Added in v0.3. |
@@ -164,6 +164,17 @@ latest stable version of the server"). For an image you build yourself, pin the 
 shape: `registry.example.internal/mirror/langchain/langgraph-server:0.14`, mirroring the
 `0.14-py3.12-wolfi` tag family. If your pipeline prefers to own the `FROM` line outright, that is
 also fine: `langgraph dockerfile` output is a plain Dockerfile you may edit before building.
+
+**FIPS images are the case where you must own the `FROM` line.** LangChain publishes `-fips`
+variants of the Wolfi Agent Server images, built on Chainguard FIPS bases
+([Agent Server changelog](https://docs.langchain.com/langsmith/agent-server-changelog),
+[FIPS-compliant images](https://docs.langchain.com/langsmith/self-host-fips)), and the tags mirror
+the non-FIPS names: `langchain/langgraph-api:3.12-wolfi-fips` and
+`langchain/langgraph-server:0.14-py3.12-wolfi-fips` both exist on Docker Hub (checked while
+writing). Neither `image_distro` nor `base_image` can produce that tag, because the CLI appends its
+own `-py<version>-<distro>` suffix and has no FIPS distro. The sample's `build.sh` therefore takes
+a `BASE_IMAGE` override that rewrites the first line after rendering; [module 07](./07-standalone-helm-deploy.md#fips-builds)
+shows the build and the in-image FIPS self-test.
 ### Runtime wiring keys
 
 | Key | Type | Default | Purpose and example |

@@ -9,6 +9,7 @@ images:
   apiServerImage:
     repository: platform/my-agent
     tag: "1.4.0"                           # immutable tag written by the pipeline (git sha or semver)
+                                           # for FIPS: build with BASE_IMAGE=langchain/langgraph-api:3.12-wolfi-fips (module 07)
     pullPolicy: IfNotPresent
 
 config:

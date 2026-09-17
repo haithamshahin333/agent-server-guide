@@ -200,6 +200,50 @@ env: PORT=8000  N_JOBS_PER_WORKER=10  LANGSERVE_GRAPHS={...}
 size: 774MB
 ```
 
+### FIPS builds
+
+If your environment requires FIPS 140 validated cryptography, LangChain publishes `-fips` variants
+of the Wolfi Agent Server images, built on Chainguard FIPS bases with a FIPS-compliant Go core
+server and FIPS-mode OpenSSL ([Agent Server changelog](https://docs.langchain.com/langsmith/agent-server-changelog),
+[FIPS-compliant images](https://docs.langchain.com/langsmith/self-host-fips)). The tags follow the
+non-FIPS names with a `-fips` suffix; `langchain/langgraph-api:3.12-wolfi-fips` and
+`langchain/langgraph-server:0.14-py3.12-wolfi-fips` were both present on Docker Hub while writing,
+with per-architecture `-amd64` and `-arm64` tags alongside.
+
+`langgraph.json` cannot select them: `image_distro` accepts only `debian`, `wolfi` and `bookworm`
+(the CLI rejects `"wolfi-fips"` with "Invalid image_distro"), and `base_image` gets the CLI's own
+`-py3.12-wolfi` suffix appended. Since your pipeline owns the Dockerfile anyway, the fix is a
+one-line override after rendering, which `build.sh` supports through `BASE_IMAGE`:
+
+```bash
+BASE_IMAGE=langchain/langgraph-api:3.12-wolfi-fips IMAGE_TAG=fips ./sample/pipeline/build.sh
+```
+
+This was built while writing the guide. The rest of the generated Dockerfile (the `/deps` install,
+the `LANGSERVE_GRAPHS` line, the Wolfi package clean-up) applied unchanged, the resulting image was
+776MB against 774MB for the non-FIPS build, and it carries the same `langgraph-api` 0.14.1. The
+Chainguard self-test tool the docs describe is present in the built application image, not only in
+the base, so a pipeline can assert FIPS mode on every build:
+
+```
+$ docker run --rm --entrypoint sh my-agent:fips -c 'openssl-fips-test | tail -9; python -c "import importlib.metadata as m; print(m.version(\"langgraph-api\"))"'
+FIPS cryptographic module provider details (fips.so):
+        name:           Chainguard FIPS Provider for OpenSSL
+        version:        3.4.0
+        build:          3.4.0-r5
+Locate applicable certificate(s) at: CMVP #5132 (with entropy #E191)
+Lifecycle assurance satisfied.
+0.14.1
+```
+
+Keep the Python version and distro family in `langgraph.json` aligned with the override (`3.12`
+and `wolfi` here) so the clean-up steps still match the base. Two boundaries from the docs: the
+FIPS variants cover LangChain's own images, while Postgres and Redis are not published as FIPS
+variants, so bring your own FIPS-mode data stores through the chart's `postgres.external` and
+`redis.external` settings; and LangChain asks that FIPS or air-gapped rollouts be scoped with your
+account executive before you begin. On the control plane path the same `-fips` convention applies
+to the platform images, including `langchain/langgraph-operator-fips` ([module 08](./08-langsmith-deployments-self-hosted.md)).
+
 ### Practical build rules
 
 Regenerate the Dockerfile on every build rather than trusting the committed copy; `langgraph.json`
