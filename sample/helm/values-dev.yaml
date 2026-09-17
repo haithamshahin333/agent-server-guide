@@ -1,0 +1,46 @@
+# values-dev.yaml : smallest useful install. Bundled Postgres + Redis, single-host mode
+# (API pods also execute runs). Good for a laptop kind cluster or a shared dev namespace.
+#
+#   helm upgrade -i agent-server langchain/langgraph-cloud --version 0.3.4 \
+#     -n agent-server --create-namespace -f values-dev.yaml
+images:
+  apiServerImage:
+    repository: my-agent        # your image, built from the generated Dockerfile
+    tag: dev
+    pullPolicy: IfNotPresent    # kind: image is side-loaded; use Always with a real registry
+
+config:
+  # Provide the license and LangSmith key through a pre-created Secret in real environments
+  # (see values-split.yaml). Inline values are acceptable only for throwaway clusters.
+  langGraphCloudLicenseKey: ""
+  apiKey: ""
+  numberOfJobsPerWorker: 10     # becomes N_JOBS_PER_WORKER on the API pods in single-host mode
+
+apiServer:
+  deployment:
+    replicaCount: 1
+    resources:
+      requests: { cpu: 500m, memory: 1Gi }
+      limits:   { cpu: "2",  memory: 4Gi }
+    extraEnv:
+      - name: MODEL
+        value: openai:gpt-4o-mini
+      - name: LOG_JSON
+        value: "true"
+  service:
+    type: ClusterIP             # no cloud load balancer on kind; reach it with port-forward
+
+# Bundled Postgres: the chart's defaults request 2 CPU / 8Gi; trim for a dev box.
+postgres:
+  statefulSet:
+    resources:
+      requests: { cpu: 250m, memory: 512Mi }
+      limits:   { cpu: "2",  memory: 2Gi }
+    persistence:
+      size: 2Gi
+
+redis:
+  deployment:
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits:   { cpu: "1",  memory: 1Gi }

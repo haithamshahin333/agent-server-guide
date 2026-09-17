@@ -1,0 +1,106 @@
+# values-prod.yaml : production shape. External Postgres and Redis, split API/queue,
+# ingress with TLS, autoscaling, disruption budgets, sized from the scaling guide's
+# "medium reads / medium writes" example (3 API, 5 queue workers, 10 jobs per worker).
+# Validate with:  helm template agent-server langchain/langgraph-cloud --version 0.3.4 -f values-prod.yaml
+images:
+  registry: registry.example.internal      # prepended to every repository below
+  imagePullSecrets:
+    - name: registry-credentials
+  apiServerImage:
+    repository: platform/my-agent
+    tag: "1.4.0"                           # immutable tag written by the pipeline (git sha or semver)
+    pullPolicy: IfNotPresent
+
+config:
+  existingSecretName: agent-server-keys    # api_key + langgraph_cloud_license_key
+  numberOfJobsPerWorker: 10
+  # httpMaxRequestBodyBytes: "20971520"    # tighten the 300MB default if clients never upload
+
+# Bring your own data stores. Each deployment gets its OWN database name and Redis db number;
+# instances can be shared, databases cannot.
+postgres:
+  external:
+    enabled: true
+    existingSecretName: agent-server-postgres   # key: postgres_connection_url
+    # or: connectionUrl: "postgresql://user:pass@pg.example.internal:5432/agent_server?sslmode=require"
+redis:
+  external:
+    enabled: true
+    existingSecretName: agent-server-redis      # key: redis_connection_url
+    # or: connectionUrl: "rediss://redis.example.internal:6379/1"
+
+# Exactly one of ingress / gateway / istioGateway may be enabled.
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hostname: agents.example.internal
+  annotations:
+    cert-manager.io/cluster-issuer: internal-ca
+  tls:
+    - hosts: [agents.example.internal]
+      secretName: agents-example-internal-tls
+
+apiServer:
+  deployment:
+    replicaCount: 3
+    terminationGracePeriodSeconds: 60
+    resources:
+      requests: { cpu: "1", memory: 2Gi }
+      limits:   { cpu: "2", memory: 4Gi }
+    extraEnv:
+      - name: LOG_JSON
+        value: "true"
+      - name: LANGSMITH_ENDPOINT             # traces to self-hosted LangSmith; no trailing slash
+        value: https://langsmith.example.internal
+      - name: LANGGRAPH_POSTGRES_POOL_MAX_SIZE
+        value: "50"
+      - name: CORS_ALLOW_ORIGINS
+        value: https://app.example.internal
+    envFrom:
+      - secretRef:
+          name: my-agent-app-secrets         # OPENAI_API_KEY etc. Never the license/API key.
+  service:
+    type: ClusterIP                          # ingress fronts it; LoadBalancer not needed
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+  pdb:
+    enabled: true
+    minAvailable: 2
+
+queue:
+  enabled: true
+  deployment:
+    replicaCount: 5
+    terminationGracePeriodSeconds: 300       # long enough for BG_JOB_SHUTDOWN_GRACE_PERIOD_SECS
+    resources:
+      requests: { cpu: "1", memory: 2Gi }
+      limits:   { cpu: "2", memory: 4Gi }
+    extraEnv:
+      - name: LOG_JSON
+        value: "true"
+      - name: LANGSMITH_ENDPOINT
+        value: https://langsmith.example.internal
+      - name: LANGGRAPH_POSTGRES_POOL_MAX_SIZE
+        value: "50"
+      - name: BG_JOB_SHUTDOWN_GRACE_PERIOD_SECS
+        value: "240"
+      - name: MODEL
+        value: openai:gpt-4o-mini
+    envFrom:
+      - secretRef:
+          name: my-agent-app-secrets
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+    keda:                                     # requires KEDA in the cluster; adds a pending-runs trigger
+      enabled: true
+      pollingInterval: 30
+      cooldownPeriod: 300
+  pdb:
+    enabled: true
+    minAvailable: 1

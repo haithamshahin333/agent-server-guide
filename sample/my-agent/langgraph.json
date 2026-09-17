@@ -1,0 +1,10 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "echo": "./src/my_agent/echo.py:graph",
+    "agent": "./src/my_agent/agent.py:make_agent"
+  },
+  "env": ".env",
+  "python_version": "3.12",
+  "image_distro": "wolfi"
+}

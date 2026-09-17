@@ -1,0 +1,42 @@
+# values-split.yaml : split API and queue. API pods only serve HTTP (the chart sets
+# N_JOBS_PER_WORKER=0 on them); dedicated queue pods execute runs. Secrets come from a
+# pre-created Kubernetes Secret instead of inline values.
+#
+#   kubectl -n agent-server create secret generic agent-server-keys \
+#     --from-literal=api_key="$LANGSMITH_API_KEY" \
+#     --from-literal=langgraph_cloud_license_key="$LANGGRAPH_CLOUD_LICENSE_KEY"
+#   helm upgrade -i agent-server langchain/langgraph-cloud --version 0.3.4 \
+#     -n agent-server -f values-dev.yaml -f values-split.yaml
+images:
+  apiServerImage:
+    repository: my-agent
+    tag: dev
+    pullPolicy: IfNotPresent
+
+config:
+  existingSecretName: agent-server-keys   # keys: api_key, langgraph_cloud_license_key
+  numberOfJobsPerWorker: 10               # now applies to queue pods only
+
+apiServer:
+  deployment:
+    replicaCount: 2
+    extraEnv:
+      - name: LOG_JSON
+        value: "true"
+
+queue:
+  enabled: true                            # the one switch that creates the worker Deployment
+  deployment:
+    replicaCount: 2
+    terminationGracePeriodSeconds: 200     # >= BG_JOB_SHUTDOWN_GRACE_PERIOD_SECS (default 180)
+    resources:
+      requests: { cpu: 500m, memory: 1Gi }
+      limits:   { cpu: "2",  memory: 4Gi }
+    extraEnv:
+      - name: LOG_JSON
+        value: "true"
+      - name: BG_JOB_SHUTDOWN_GRACE_PERIOD_SECS
+        value: "180"
+      # Application env must be repeated here: graphs run on these pods, not on the API pods.
+      - name: MODEL
+        value: openai:gpt-4o-mini

@@ -1,0 +1,46 @@
+# Local pre-flight for the built image: the real server (Postgres-backed, not the in-memory dev
+# server) plus its two backing services. Mirrors the docs' Docker Compose example.
+# Usage:  IMAGE_NAME=my-agent:dev docker compose up -d && curl -s localhost:8123/ok
+# Set LANGSMITH_API_KEY and LANGGRAPH_CLOUD_LICENSE_KEY in .env or the shell for a licensed run.
+volumes:
+  langgraph-data:
+    driver: local
+services:
+  langgraph-redis:
+    image: redis:6
+    healthcheck:
+      test: redis-cli ping
+      interval: 5s
+      timeout: 1s
+      retries: 5
+  langgraph-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - langgraph-data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U postgres
+      start_period: 10s
+      timeout: 1s
+      retries: 5
+      interval: 5s
+  langgraph-api:
+    image: ${IMAGE_NAME:-my-agent:dev}
+    ports:
+      - "8123:8000"
+    depends_on:
+      langgraph-redis:
+        condition: service_healthy
+      langgraph-postgres:
+        condition: service_healthy
+    environment:
+      REDIS_URI: redis://langgraph-redis:6379
+      DATABASE_URI: postgres://postgres:postgres@langgraph-postgres:5432/postgres?sslmode=disable
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGGRAPH_CLOUD_LICENSE_KEY: ${LANGGRAPH_CLOUD_LICENSE_KEY:-}
+      # Application settings the graphs read:
+      MODEL: ${MODEL:-openai:gpt-4o-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
