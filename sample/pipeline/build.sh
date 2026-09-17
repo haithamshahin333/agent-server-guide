@@ -13,6 +13,12 @@
 # same Python version and distro family as langgraph.json so the rest of the Dockerfile still fits.
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
+if [ ! -f "$APP_DIR/.dockerignore" ]; then
+  echo "ERROR: $APP_DIR/.dockerignore is missing. The generated Dockerfile runs 'ADD . /deps/<name>'," >&2
+  echo "       which would copy .env, .venv and .git into the image. Add a .dockerignore first (see module 07)." >&2
+  exit 3
+fi
+
 log "Rendering Dockerfile from $APP_DIR/langgraph.json -> $DOCKERFILE"
 tmp="$(mktemp -d)"
 ( cd "$APP_DIR" && uv run langgraph dockerfile "$tmp/Dockerfile" >/dev/null )

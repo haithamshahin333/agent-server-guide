@@ -1,0 +1,64 @@
+# docker-compose.split.yml : the same image in two roles, mirroring what the Helm chart does with
+# queue.enabled=true. The API service serves HTTP only (N_JOBS_PER_WORKER=0); the queue service runs
+# the worker entrypoint and executes runs. Scale workers with:
+#   docker compose -f docker-compose.split.yml up -d --scale langgraph-queue=3
+# Local development and testing only; production belongs on Kubernetes with the chart (module 07).
+volumes:
+  langgraph-data:
+    driver: local
+services:
+  langgraph-redis:
+    image: redis:6
+    healthcheck:
+      test: redis-cli ping
+      interval: 5s
+      timeout: 1s
+      retries: 5
+  langgraph-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - langgraph-data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U postgres
+      start_period: 10s
+      timeout: 1s
+      retries: 5
+      interval: 5s
+  langgraph-api:
+    image: ${IMAGE_NAME:-my-agent:dev}
+    ports:
+      - "8124:8000"
+    depends_on:
+      langgraph-redis:
+        condition: service_healthy
+      langgraph-postgres:
+        condition: service_healthy
+    environment: &server_env
+      REDIS_URI: redis://langgraph-redis:6379
+      DATABASE_URI: postgres://postgres:postgres@langgraph-postgres:5432/postgres?sslmode=disable
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGGRAPH_CLOUD_LICENSE_KEY: ${LANGGRAPH_CLOUD_LICENSE_KEY:-}
+      LOG_JSON: "true"
+      MODEL: ${MODEL:-openai:gpt-4o-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      N_JOBS_PER_WORKER: "0"          # API role: accept requests, execute nothing
+  langgraph-queue:
+    image: ${IMAGE_NAME:-my-agent:dev}
+    command: ["/storage/queue_entrypoint.sh"]   # worker role, same script the chart uses
+    depends_on:
+      langgraph-api:
+        condition: service_started    # the API runs the database migrations first
+    environment:
+      <<: *server_env
+      N_JOBS_PER_WORKER: "10"         # worker role: up to 10 concurrent runs per container
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ok')"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s

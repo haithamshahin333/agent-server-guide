@@ -246,6 +246,17 @@ to the platform images, including `langchain/langgraph-operator-fips` ([module 0
 
 ### Practical build rules
 
+**Rule zero: ship a `.dockerignore`.** The generated Dockerfile's `ADD . /deps/<name>` copies the
+entire project directory into the image. The first `my-agent:dev` image built for this guide was
+inspected afterwards and contained the project's `.venv` (196MB), its `.env`, the dev server's
+`.langgraph_api/` state and `.pytest_cache/`; only placeholders were in that `.env`, but with a real
+key that image would have leaked it to every registry it was pushed to. The CLI knows this: the
+docstring of its own `.dockerignore` template says "the main goal is to exclude .env files by
+default", but that file is only written when you pass `langgraph dockerfile --add-docker-compose`.
+Both sample projects now carry a `.dockerignore` (`.env`, `.venv/`, `.git/`, `.langgraph_api/`,
+caches), `build.sh` refuses to build without one, and the rebuilt quickstart image measured 611MB
+against 804MB before, with `/deps/quickstart-agent` down to 496K of source, config and lockfile.
+
 Regenerate the Dockerfile on every build rather than trusting the committed copy; `langgraph.json`
 edits do not update it. [`sample/pipeline/build.sh`](../sample/pipeline/build.sh) does exactly
 this and warns when the committed file drifted.
@@ -298,7 +309,63 @@ as a `CrashLoopBackOff` with the readiness probe failing. Set `LANGSMITH_API_KEY
 `{"ok":true}` as the expected response
 ([Docker Compose section](https://docs.langchain.com/langsmith/deploy-standalone-server#docker-compose)).
 
+With `LANGSMITH_API_KEY` present (Compose reads it from `sample/.env` or the shell), the same
+stack came up cleanly:
+
+```
+$ docker compose -p agent-server-tutorial up -d && curl -s localhost:8123/ok
+{"ok":true}
+$ curl -s -X POST localhost:8123/runs/wait -H 'Content-Type: application/json' \
+    -d '{"assistant_id":"echo","input":{"messages":[{"role":"user","content":"hello compose"}]}}'
+... "content": "echo: hello compose" ...
+```
+
 Tear down with `docker compose -p agent-server-tutorial down -v`.
+
+### Compose with a separate worker container
+
+The docs' Compose example is single-host: one container both serves HTTP and executes runs. You
+can reproduce the chart's split mode locally, because the split is nothing more than the two
+environment facts [module 06](./06-runtime-and-tuning.md#how-the-chart-wires-the-split) describes:
+an API container with `N_JOBS_PER_WORKER=0`, and worker containers started from
+`/storage/queue_entrypoint.sh` with a positive `N_JOBS_PER_WORKER`, all from the same image.
+[`sample/docker-compose.split.yml`](../sample/docker-compose.split.yml) does exactly that, and
+the queue service can be scaled like any Compose service:
+
+```bash
+cd sample
+docker compose -f docker-compose.split.yml -p agent-server-split up -d --scale langgraph-queue=2
+curl -s localhost:8124/ok
+```
+
+Captured while writing, after three `runs/wait` calls against the API container:
+
+```
+$ docker compose -f docker-compose.split.yml -p agent-server-split ps
+SERVICE              STATUS
+langgraph-api        Up (healthy)
+langgraph-postgres   Up (healthy)
+langgraph-queue      Up (healthy)
+langgraph-queue      Up (healthy)
+langgraph-redis      Up (healthy)
+
+$ docker logs agent-server-split-langgraph-api-1 | grep -o 'N_JOBS_PER_WORKER is 0. Skipping queue.'
+N_JOBS_PER_WORKER is 0. Skipping queue.
+
+# run-related events per container
+langgraph-api-1     (none)
+langgraph-queue-1   Starting 10 background workers; Starting background run x2; Background run succeeded x2
+langgraph-queue-2   Starting 10 background workers; Starting background run x1; Background run succeeded x1
+```
+
+The API container announced that it skipped the queue, and the three runs were spread across the
+two worker containers. Two details in the file are worth copying if you write your own: the worker
+service depends on the API service because the API process runs the database migrations at start,
+and the worker health check hits `/ok` on port 8000 with Python's `urllib` because the image has no
+`curl`. This layout is for local testing and demos only. The docs are explicit that non-Kubernetes
+orchestrators leave queue autoscaling, graceful run draining and version upgrades to you, and that
+the Helm chart is the tested production path
+([supported compute platforms](https://docs.langchain.com/langsmith/deploy-standalone-server#supported-compute-platforms)).
 
 ## Hands-on: install on a kind cluster
 
@@ -796,6 +863,9 @@ Verifying command, once keys are in place:
 
 ## Gotchas
 
+- **`ADD .` copies everything.** Without a `.dockerignore`, `.env`, `.venv` and local state end up in
+  the image. Add one before the first build, and verify with
+  `docker run --rm --entrypoint sh <image> -c 'ls -a /deps/<name>'`.
 - **No key, no server.** Migrations run, then startup fails with `License verification failed`.
   Kubernetes shows `CrashLoopBackOff`; Compose shows an empty `curl /ok`. Supply
   `LANGGRAPH_CLOUD_LICENSE_KEY` (production) or `LANGSMITH_API_KEY` (development) through the

@@ -73,6 +73,10 @@ For completeness: LangChain also hosts the whole thing for you as LangSmith Depl
 
 Module [07](./07-standalone-helm-deploy.md) walks through the standalone path hands-on and module [08](./08-langsmith-deployments-self-hosted.md) walks through the control plane path. Both start from the same image built in module [02](./02-new-project.md).
 
+If you would rather see the whole journey before reading about its parts, the
+[Quickstart](./00-quickstart.md) builds a Deep Agent, runs it locally, builds the image and brings
+it up as a split API and worker stack with Docker Compose in one sitting.
+
 ## Who manages what
 
 Self-hosting shifts operational ownership to your team. The docs summarize it this way ([Deploy to self-hosted: who manages what](https://docs.langchain.com/langsmith/deploy-to-self-hosted-overview#who-manages-what)):

@@ -1,0 +1,13 @@
+# Keep local-only files out of the image. `langgraph dockerfile` renders `ADD . /deps/<name>`,
+# which copies the whole directory unless a .dockerignore excludes it.
+.env
+.env.*
+!.env.example
+.venv/
+.git/
+.langgraph_api/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+node_modules/
+Dockerfile

@@ -93,6 +93,7 @@ Every documentation page and repository cited anywhere in this guide, deduplicat
 - Deploy to self-hosted (topologies, who manages what): https://docs.langchain.com/langsmith/deploy-to-self-hosted-overview
 - Self-host standalone servers: https://docs.langchain.com/langsmith/deploy-standalone-server
 - FIPS-compliant images: https://docs.langchain.com/langsmith/self-host-fips
+- Deep Agents quickstart: https://docs.langchain.com/oss/python/deepagents/quickstart
 - Deep Agents, going to production (uses `langgraph.json`): https://docs.langchain.com/oss/python/deepagents/going-to-production
 - Deep Agents, async subagents and worker-pool sizing: https://docs.langchain.com/oss/python/deepagents/async-subagents
 - Deploy with control plane: https://docs.langchain.com/langsmith/deploy-with-control-plane

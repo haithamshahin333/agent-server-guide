@@ -161,6 +161,8 @@ After a LangSmith API key was added to the Secret and the Deployments restarted 
 
 Across a smoke test, the Python SDK client and a streamed run, the two API pods logged zero `Starting background run` events and the two queue pods logged all of them. The metrics endpoints tell the same story: a queue pod reports `lg_api_workers_max 10.0` and `lg_api_workers_available 10.0`, and an API pod running with `N_JOBS_PER_WORKER=0` reports no `lg_api_workers_*` series at all, only `lg_api_num_pending_runs` and `lg_api_num_running_runs`. One observation to file away for the knob table below: both pod types reported `lg_api_pg_pool_max 200.0`, whereas the docs give the `LANGGRAPH_POSTGRES_POOL_MAX_SIZE` default as 150; read the gauge on your own version rather than assuming the documented default.
 
+You do not need a cluster to watch this. [`sample/docker-compose.split.yml`](../sample/docker-compose.split.yml) runs the same two roles as Compose services (the API with `N_JOBS_PER_WORKER=0`, workers from the queue entrypoint), and [module 07](./07-standalone-helm-deploy.md#compose-with-a-separate-worker-container) shows the captured result: the API container logs `N_JOBS_PER_WORKER is 0. Skipping queue.` and only the worker containers log `Starting background run`.
+
 ### What the two entrypoints do
 
 The image ships both scripts under `/storage`. Inspected from the image built in [module 07](./07-standalone-helm-deploy.md) (`docker run --rm --entrypoint sh my-agent:dev -c 'cat /storage/queue_entrypoint.sh'`):
