@@ -1,0 +1,63 @@
+# prometheusrule.yaml : the first alerts for an Agent Server, one per stage of module 10's diagnosis
+# table. Metric names as served by langchain/langgraph-api 0.14.x: histograms are in milliseconds and
+# keep their bare names; counters carry a _total suffix. Labels (container, pod, namespace) come from
+# podmonitor.yaml. agent_graph_factory_duration_ms is registered by the sample's own factory
+# (my-agent/src/my_agent/telemetry.py); drop that rule if your graph does not record it.
+#
+#   kubectl -n agent-server apply -f prometheusrule.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: agent-server-alerts
+  labels:
+    app.kubernetes.io/part-of: agent-server
+spec:
+  groups:
+    - name: agent-server.lifecycle
+      interval: 30s
+      rules:
+        - alert: AgentServerWorkersSaturated
+          expr: |
+            sum(lg_api_workers_available{container="queue"}) == 0
+            and on() sum(lg_api_num_pending_runs{container="api-server"}) > 0
+          for: 2m
+          labels: { severity: warning }
+          annotations:
+            summary: "Every queue-worker slot is busy and runs are waiting"
+            description: "workers_available is 0 across all queue pods while pending runs > 0 for 2 minutes. Add queue replicas (or let KEDA), raise N_JOBS_PER_WORKER for IO-bound agents, or make the agent faster."
+
+        - alert: AgentServerQueueWaitHigh
+          expr: |
+            histogram_quantile(0.95, sum by (le) (rate(lg_api_run_queue_wait_time_1st_attempt_bucket[5m]))) > 5000
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: "p95 time-in-queue before first attempt is above 5 s"
+            description: "Runs wait more than 5 s (p95) before a worker picks them up. Pickup is a Redis push, so this is capacity, not polling: scale workers or reduce per-run duration."
+
+        - alert: AgentServerGraphFactorySlow
+          expr: |
+            histogram_quantile(0.95, sum by (le) (rate(agent_graph_factory_duration_ms_bucket{container="queue", access_context="threads.create_run"}[5m]))) > 500
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: "Building the graph takes more than 0.5 s (p95) per run"
+            description: "The graph factory is invoked on every run; its p95 exceeds 500 ms on the queue workers. Move config-independent setup (credentials, clients, tool loading) to module scope and keep the factory async. The server itself logs a warning above 100 ms and an error above 250 ms (fields elapsed_ms, graph_id, run_id)."
+
+        - alert: AgentServerRunFailures
+          expr: |
+            sum(rate(lg_api_run_failed_after_retry_counter_total[5m])) > 0
+            or sum(rate(lg_api_run_abandoned_by_shutdown_counter_total[5m])) > 0
+          for: 2m
+          labels: { severity: warning }
+          annotations:
+            summary: "Runs are failing after retries or being abandoned at shutdown"
+            description: "failed_after_retry means the agent errored on every attempt (check queue logs with level=error: model 429s, a wrong model name). abandoned_by_shutdown means a pod stopped before BG_JOB_SHUTDOWN_GRACE_PERIOD_SECS elapsed; raise terminationGracePeriodSeconds."
+
+        - alert: AgentServerPgPoolQueued
+          expr: sum by (pod) (rate(lg_api_pg_pool_requests_queued_total[5m])) > 1
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: "Postgres connection requests are queueing on {{ $labels.pod }}"
+            description: "The per-pod pool (lg_api_pg_pool_max) is exhausted. Raise LANGGRAPH_POSTGRES_POOL_MAX_SIZE, lower N_JOBS_PER_WORKER, or give Postgres more capacity."

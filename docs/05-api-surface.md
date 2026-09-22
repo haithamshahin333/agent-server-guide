@@ -110,6 +110,8 @@ curl -s -X POST $B/assistants/search -H 'Content-Type: application/json' -d '{}'
 # 046b5dc7-2108-582c-9c6c-31d556d138f0  graph_id=echo   name=echo   metadata={'created_by': 'system'}
 ```
 
+A current checkout of the sample lists a third system assistant, `perf`, added later by [module 10](./10-performance-deep-dive.md); the output above was captured before it existed.
+
 Create an assistant that bakes in a `context` for the `echo` graph (captured):
 
 ```bash

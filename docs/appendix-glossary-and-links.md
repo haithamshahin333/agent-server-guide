@@ -50,17 +50,22 @@ Terms are listed alphabetically within each group. The module where a term is fi
 | **API server (API pod)** [06] | A container running `/storage/entrypoint.sh`. Serves HTTP, creates runs, forwards streams. In split mode it has `N_JOBS_PER_WORKER=0` and executes no runs. |
 | **`BG_JOB_ISOLATED_LOOPS`** [03, 06] | Runs background jobs on an event loop separate from the API loop. A stopgap for synchronous code, not a fix; splits the Postgres pool per worker. |
 | **`BG_JOB_SHUTDOWN_GRACE_PERIOD_SECS`** [06, 09] | How long a shutting-down worker waits for in-flight runs (default 180 s, max 3600 s). Pair with the pod's `terminationGracePeriodSeconds`. |
+| **Access context** [10] | `ServerRuntime.access_context`: why the server is calling a graph factory. `threads.create_run` on a queue worker about to execute a run (with `execution_runtime` set); `assistants.read`, `threads.read`, `threads.update` on the API tier for schema and state reads. |
 | **Beacon** [00] | `https://beacon.langchain.com`, the endpoint used for license verification and usage reporting. Egress to it is required unless you hold an offline license. |
+| **Cold and warm build** [10] | The first graph-factory call in a fresh process pays for imports and client construction (cold, hundreds of milliseconds); later calls reuse them (warm, single-digit milliseconds). A cold build can trip the server's slow-graph warning. |
 | **Distributed runtime** [06] | A third deployment mode where orchestration and execution of a run are separate processes. Mentioned in the docs; not configured in this guide. |
+| **Graph factory** [02, 03, 10] | A function named in `langgraph.json` instead of a compiled graph. The server binds its arguments by type annotation (`RunnableConfig`, `ServerRuntime`), calls it on every `get_graph()` and memoizes nothing, so it must be cheap, asynchronous and return the same topology in every access context. |
 | **KEDA** [06, 07, 08] | Kubernetes Event-Driven Autoscaling. The standalone chart can scale queue pods on a Postgres query counting pending runs; LangSmith Deployments requires KEDA installed. |
 | **`LANGGRAPH_CLOUD_LICENSE_KEY`** [00, 07] | The Enterprise license key the containerised server verifies once at startup. Without it (or a LangSmith API key) the server exits after running migrations. |
 | **`LANGGRAPH_POSTGRES_POOL_MAX_SIZE`** [06] | Per-replica upper bound on Postgres connections (default 150). Divided per worker when isolated loops are on. |
 | **`LANGSMITH_API_KEY` / `LANGSMITH_ENDPOINT`** [00, 07] | Key and self-hosted URL for sending traces to LangSmith. The endpoint must have no trailing slash. |
 | **`N_JOBS_PER_WORKER`** [01, 06] | Maximum runs one queue worker executes concurrently (default 10). Bounds run concurrency, not request concurrency. In the chart it is `config.numberOfJobsPerWorker`. |
 | **Queue worker (queue pod)** [06] | A container running `/storage/queue_entrypoint.sh`. Claims pending runs from PostgreSQL, executes graphs, writes checkpoints, publishes stream events to Redis. |
+| **Queue wait** [10] | `lg_api_run_queue_wait_time_1st_attempt`: time from run creation to a worker picking it up. Pickup is a Redis push, so anything beyond tens of milliseconds means every slot was busy. |
 | **Redis** [01, 06] | Coordination only: wake-ups, cancellation, stream pub/sub, retry counters. Holds no user or run data. Each deployment needs its own database number. |
 | **PostgreSQL** [01, 06] | System of record for every server object, checkpoints (by default) and the store. Each deployment needs its own database name. Version 14 or newer. |
 | **Single-host mode** [06] | Default self-hosted mode: API containers also run the queue workers. |
+| **Slow graph load** [10] | The server's own log line when a `get_graph()` call exceeds 100 ms (warning) or 250 ms (error), with `elapsed_ms`, `graph_id` and `run_id`. The only build-time signal the server emits. |
 | **Split API and queue** [06] | `queue.enabled: true` in the chart: separate API and worker Deployments that scale independently. |
 | **Task queue** [01] | The durable, Postgres-backed queue of pending runs that workers lease from with exactly-once semantics. |
 
@@ -170,6 +175,8 @@ Every documentation page and repository cited anywhere in this guide, deduplicat
 - Self-hosted Agent Server metrics: https://docs.langchain.com/langsmith/self-hosted-agent-server-metrics
 - Diagnostics for self-hosted: https://docs.langchain.com/langsmith/diagnostics-self-hosted
 - CI/CD pipeline example: https://docs.langchain.com/langsmith/cicd-pipeline-example
+- Rebuild graph at runtime (graph factories, `ServerRuntime`, access contexts): https://docs.langchain.com/langsmith/graph-rebuild
+- Configure Agent Server for scale (`N_JOBS_PER_WORKER`): https://docs.langchain.com/langsmith/agent-server-scale
 
 ### Helm chart (standalone Agent Server)
 
@@ -188,3 +195,9 @@ Every documentation page and repository cited anywhere in this guide, deduplicat
 - uv documentation: https://docs.astral.sh/uv/
 - Base image tags: https://hub.docker.com/r/langchain/langgraph-server/tags
 - Agent Chat UI: https://github.com/langchain-ai/agent-chat-ui
+- `prometheus_client` instrumenting (histograms, `PROMETHEUS_DISABLE_CREATED_SERIES`): https://prometheus.github.io/client_python/instrumenting/
+- Prometheus configuration, `dns_sd_config`: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#dns_sd_config
+- Grafana provisioning (datasources, dashboards): https://grafana.com/docs/grafana/latest/administration/provisioning/
+- Grafana anonymous authentication: https://grafana.com/docs/grafana/latest/setup-grafana/configure-access/configure-authentication/anonymous-auth/
+- Docker Compose: merging Compose files: https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/
+- Docker Compose networking (service names resolve to every replica): https://docs.docker.com/compose/how-tos/networking/

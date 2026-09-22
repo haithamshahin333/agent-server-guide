@@ -994,12 +994,14 @@ dependencies = [
     { name = "langchain-core" },
     { name = "langchain-openai" },
     { name = "langgraph" },
+    { name = "langgraph-sdk" },
+    { name = "prometheus-client" },
+    { name = "structlog" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "langgraph-cli", extra = ["inmem"] },
-    { name = "langgraph-sdk" },
     { name = "pytest" },
 ]
 
@@ -1009,12 +1011,14 @@ requires-dist = [
     { name = "langchain-core", specifier = ">=1.0,<2.0" },
     { name = "langchain-openai", specifier = ">=1.6.2" },
     { name = "langgraph", specifier = ">=1.0,<2.0" },
+    { name = "langgraph-sdk", specifier = ">=0.4.4,<1.0" },
+    { name = "prometheus-client", specifier = ">=0.20,<1.0" },
+    { name = "structlog", specifier = ">=24,<26" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "langgraph-cli", extras = ["inmem"], specifier = ">=0.4" },
-    { name = "langgraph-sdk", specifier = ">=0.4.4" },
     { name = "pytest", specifier = ">=9.1.1" },
 ]
 

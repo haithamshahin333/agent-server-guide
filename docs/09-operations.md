@@ -60,6 +60,8 @@ Suggested first alerts, mapped to [module 06](./06-runtime-and-tuning.md):
 
 Scrape target: the API Service on the port you exposed (`/metrics` on the api-server). In split mode the queue pods emit worker gauges too; scrape them by pod if you want per-worker capacity, since the chart creates no Service for the queue.
 
+[Module 10](./10-performance-deep-dive.md) turns this section into a working setup and shows it live: the two environment variables, a scrape of both tiers, a dashboard with one panel per lifecycle stage, the per-run log record read with `jq`, and a histogram for graph build time, which the server does not measure on its own.
+
 ### Logs
 
 Set `LOG_JSON=true` on every pod so logs are structured, and `LOG_LEVEL=DEBUG` while investigating ([env vars](https://docs.langchain.com/langsmith/env-var-self-hosted#log_json)). Each log line carries `langgraph_api_version`, `api_variant` (`local_dev`, `licensed`) and, on the Go core lines, the component that logged. The sample values files already set `LOG_JSON`. Under LangSmith Deployments, server logs are also readable in the deployment view once the control plane has RBAC to read pods in the data plane namespace ([read Agent Server logs from other namespaces](https://docs.langchain.com/langsmith/deploy-self-hosted-full-platform#read-agent-server-logs-from-other-namespaces)).
@@ -238,6 +240,7 @@ Operations (this module)
 
 - [ ] `/metrics` scraped; alerts on queue wait time, worker availability, pool queueing, run failures after retry.
 - [ ] `LOG_JSON=true` everywhere; `LANGSMITH_ENDPOINT` and `LANGSMITH_TRACING` set on both tiers.
+- [ ] If `langgraph.json` points at a graph factory: its build time is measured and warm (module 10), and the server's slow-graph warnings are watched.
 - [ ] Postgres backups and a tested restore; MongoDB backups if used for checkpoints.
 - [ ] Upgrade procedure documented: image tag, chart version, base image, with a non-production rehearsal.
 - [ ] Runbook entries above adapted to your alerting.

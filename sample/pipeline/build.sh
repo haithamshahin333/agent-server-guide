@@ -33,9 +33,8 @@ fi
 head -1 "$DOCKERFILE"
 
 log "Building $IMAGE_REF"
-platform_args=()
-[ -n "$PLATFORM" ] && platform_args=(--platform "$PLATFORM")
-docker build "${platform_args[@]}" -t "$IMAGE_REF" -f "$DOCKERFILE" "$APP_DIR"
+# ${PLATFORM:+...} expands to nothing when PLATFORM is empty and is safe under set -u on bash 3.2 (macOS).
+docker build ${PLATFORM:+--platform "$PLATFORM"} -t "$IMAGE_REF" -f "$DOCKERFILE" "$APP_DIR"
 
 log "Built image"
 docker image ls "$IMAGE_REF" --format '{{.Repository}}:{{.Tag}}  {{.Size}}  {{.ID}}'

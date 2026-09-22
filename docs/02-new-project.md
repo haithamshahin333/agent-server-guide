@@ -224,7 +224,7 @@ Moving `create_agent` into `make_agent(config)` fixes this because the model cli
 }
 ```
 
-The two `graphs` entries show both registration styles: `echo` points at a compiled graph object, `agent` points at a factory function. `image_distro: "wolfi"` selects the smaller Wolfi-based base image (`langchain/langgraph-api:3.12-wolfi`) instead of the Debian default. Every key in this file, including the ones the sample does not use, is covered in module [04](./04-langgraph-json.md).
+The two `graphs` entries show both registration styles: `echo` points at a compiled graph object, `agent` points at a factory function. ([Module 10](./10-performance-deep-dive.md) later adds a third entry, `perf`, another factory, so the file in the repository has three.) `image_distro: "wolfi"` selects the smaller Wolfi-based base image (`langchain/langgraph-api:3.12-wolfi`) instead of the Debian default. Every key in this file, including the ones the sample does not use, is covered in module [04](./04-langgraph-json.md).
 
 ### 5. Environment file
 

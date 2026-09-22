@@ -1,0 +1,52 @@
+# docker-compose.observability.yml : Prometheus and Grafana next to the split stack, plus the two
+# environment variables that turn on the server's run-lifecycle metrics (module 10). Layer it on
+# docker-compose.split.yml; Compose merges the `environment` maps key by key:
+#
+#   docker compose -f docker-compose.split.yml -f docker-compose.observability.yml \
+#     -p agent-server-perf up -d --scale langgraph-queue=2
+#
+#   Agent Server API  http://localhost:8124
+#   Prometheus        http://localhost:9090        (Status > Targets shows one target per container)
+#   Grafana           http://localhost:3000        (folder "Agent Server", dashboard "Agent Server: request lifecycle")
+#
+# Local development and demos only: Grafana allows anonymous read-only access and both UIs bind to
+# 127.0.0.1. On Kubernetes the same two variables go into the chart's extraEnv (helm/values-metrics.yaml)
+# and the scrape is a PodMonitor (helm/podmonitor.yaml).
+services:
+  langgraph-api:
+    environment:
+      EXPOSE_INTERNAL_METRICS_PROMETHEUS: "true"   # adds queue wait, execution latency and run outcomes to GET /metrics
+      PROMETHEUS_DISABLE_CREATED_SERIES: "true"    # prometheus_client: no *_created companions for the agent's histograms
+      LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}   # never empty: the SDK rejects ""
+  langgraph-queue:
+    environment:
+      EXPOSE_INTERNAL_METRICS_PROMETHEUS: "true"
+      PROMETHEUS_DISABLE_CREATED_SERIES: "true"
+      LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
+
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=2d
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      langgraph-api:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:13.2.2
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"      # open the dashboard without logging in (read-only Viewer)
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}   # only needed to edit panels; local demo default
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus

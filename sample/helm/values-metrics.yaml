@@ -1,0 +1,23 @@
+# values-metrics.yaml : turn on the run-lifecycle metrics and JSON logs on BOTH tiers (module 10).
+# Layer it on values-dev.yaml + values-split.yaml; the chart has no shared environment block, so the
+# same variables are repeated for the API and the queue Deployments (a YAML anchor keeps them equal).
+#
+#   helm upgrade -i agent-server langchain/langgraph-cloud --version 0.3.4 -n agent-server \
+#     -f values-dev.yaml -f values-split.yaml -f values-metrics.yaml
+#
+# Then scrape GET /metrics on every pod of both tiers with podmonitor.yaml (the queue has no Service).
+apiServer:
+  deployment:
+    extraEnv: &metricsEnv
+      - name: LOG_JSON
+        value: "true"
+      - name: EXPOSE_INTERNAL_METRICS_PROMETHEUS   # queue wait, execution latency, run outcomes on /metrics
+        value: "true"
+      - name: PROMETHEUS_DISABLE_CREATED_SERIES    # prometheus_client: no *_created companions for agent histograms
+        value: "true"
+      - name: MODEL
+        value: openai:gpt-4o-mini
+
+queue:
+  deployment:
+    extraEnv: *metricsEnv

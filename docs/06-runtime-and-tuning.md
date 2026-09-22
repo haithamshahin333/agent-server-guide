@@ -337,6 +337,8 @@ Most of the knob table can stay at its default. Work through this sequence, in o
 7. **Add autoscaling last**, with KEDA's pending-runs trigger on the queue tier and CPU on the API tier, bounded by the same arithmetic at peak.
 8. **Reduce load** with `durability="exit"` where final state is enough, thread TTLs, and `/join` instead of polling.
 
+Before turning any dial past step 3, measure. [Module 10](./10-performance-deep-dive.md) shows the stage latencies of a single request live, on this same Compose stack, and which knob each stage points to; the sizing formulas above need those numbers as input.
+
 Everything else in the table (Redis prefixes, IAM auth, MongoDB checkpoints, OTel, `MOUNT_PREFIX`) is situational and should be driven by a specific requirement, not tuned pre-emptively.
 
 ## Hands-on

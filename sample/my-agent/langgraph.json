@@ -1,8 +1,11 @@
 {
-  "dependencies": ["."],
+  "dependencies": [
+    "."
+  ],
   "graphs": {
     "echo": "./src/my_agent/echo.py:graph",
-    "agent": "./src/my_agent/agent.py:make_agent"
+    "agent": "./src/my_agent/agent.py:make_agent",
+    "perf": "./src/my_agent/perf.py:make_perf_agent"
   },
   "env": ".env",
   "python_version": "3.12",

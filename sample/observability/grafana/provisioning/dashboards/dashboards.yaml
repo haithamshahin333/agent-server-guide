@@ -1,0 +1,12 @@
+# Grafana dashboard provisioning: every JSON file in ../../dashboards appears in the "Agent Server" folder.
+apiVersion: 1
+providers:
+  - name: agent-server
+    folder: Agent Server
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

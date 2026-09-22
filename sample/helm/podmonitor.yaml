@@ -1,0 +1,26 @@
+# podmonitor.yaml : scrape GET /metrics on both Agent Server tiers (module 10).
+#
+# The chart creates no Service for the queue Deployment and exposes no scrape options, so a PodMonitor
+# (Prometheus Operator; Azure Managed Prometheus accepts the same object under
+# apiVersion azmonitoring.coreos.com/v1) is the least intrusive way to reach every pod. Both tiers
+# name their container port after the tier, so one object covers them. Every scraped series carries
+# `pod`, `namespace` and `container` (api-server or queue): the dashboard filters on those.
+#
+#   kubectl -n agent-server apply -f podmonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: agent-server
+  labels:
+    app.kubernetes.io/part-of: agent-server
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: agent-server   # the Helm release name
+  podMetricsEndpoints:
+    - port: api-server
+      path: /metrics
+      interval: 15s
+    - port: queue
+      path: /metrics
+      interval: 15s

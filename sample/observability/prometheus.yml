@@ -1,0 +1,40 @@
+# prometheus.yml : scrape GET /metrics on both Agent Server tiers of the Compose stack (module 10).
+#
+# The labels `container`, `namespace` and `pod` are set on purpose to match what a PodMonitor produces
+# on Kubernetes (container name, namespace, pod name), so the Grafana dashboard JSON in
+# grafana/dashboards/ works unchanged in both places.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # The API tier: one container, a fixed Compose DNS name.
+  - job_name: agent-server-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["langgraph-api:8000"]
+        labels:
+          container: api-server
+          namespace: compose
+          pod: langgraph-api
+
+  # The queue tier: scaled with `--scale langgraph-queue=N`. Compose's DNS returns one A record per
+  # replica for the bare service name, so a DNS service-discovery job finds every worker and follows
+  # scale changes at each refresh. (Docker Swarm resolves a service name to a single VIP; there you
+  # would query `tasks.langgraph-queue` instead.)
+  - job_name: agent-server-queue
+    metrics_path: /metrics
+    dns_sd_configs:
+      - names: ["langgraph-queue"]
+        type: A
+        port: 8000
+        refresh_interval: 15s
+    relabel_configs:
+      - target_label: container
+        replacement: queue
+      - target_label: namespace
+        replacement: compose
+      - source_labels: [__address__]      # 172.18.0.7:8000 -> queue@172.18.0.7 (DNS A records carry no container name)
+        regex: "([^:]+):.*"
+        target_label: pod
+        replacement: "queue@$1"

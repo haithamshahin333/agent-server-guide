@@ -17,10 +17,17 @@ IMAGE_NAME=my-agent:dev LANGSMITH_API_KEY=... docker compose up -d && curl -s lo
 # or split API + workers locally (port 8124):
 docker compose -f docker-compose.split.yml up -d --scale langgraph-queue=2 && curl -s localhost:8124/ok
 
+# module 10: the split stack plus Prometheus and Grafana, then some load
+docker compose -f docker-compose.split.yml -f docker-compose.observability.yml -p agent-server-perf up -d --scale langgraph-queue=2
+uv run --project my-agent python loadgen.py --runs 5 --concurrency 5     # dashboard at http://localhost:3000
+
 # deploy to Kubernetes with the standalone Helm chart
 KIND_CLUSTER=agent-server-tutorial ./pipeline/push.sh      # or REGISTRY=... for a real registry
 VALUES_FILES="helm/values-dev.yaml helm/values-split.yaml" ./pipeline/deploy.sh
 ./pipeline/smoke.sh
+# module 10 on Kubernetes: metrics on both tiers, scraped by a PodMonitor, with the first alerts
+VALUES_FILES="helm/values-dev.yaml helm/values-split.yaml helm/values-metrics.yaml" ./pipeline/deploy.sh
+kubectl -n agent-server apply -f helm/podmonitor.yaml -f helm/prometheusrule.yaml
 ```
 
 For the LangSmith Deployments path (module 08) with managed Postgres and Redis, replace the last two

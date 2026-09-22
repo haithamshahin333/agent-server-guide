@@ -1,0 +1,11 @@
+# Grafana datasource provisioning: the Prometheus container from docker-compose.observability.yml.
+# isDefault lets the dashboard's ${DS_PROMETHEUS} variable resolve to it without any manual step.
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

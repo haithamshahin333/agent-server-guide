@@ -4,6 +4,8 @@ The sample application deployed throughout the guide. See `../../docs/02-new-pro
 
 - `src/my_agent/echo.py`  deterministic graph, no model key needed (used for smoke tests)
 - `src/my_agent/agent.py` tool-calling agent built with `create_agent` (needs a model key)
+- `src/my_agent/perf.py`  factory-built agent that times its own graph build and model calls (module 10)
+- `src/my_agent/telemetry.py` the two Prometheus histograms and the timing middleware `perf.py` uses
 - `langgraph.json`        tells the Agent Server which graphs to serve and how to build the image
 
 ```bash
